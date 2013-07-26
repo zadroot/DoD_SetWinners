@@ -2,7 +2,7 @@
 * DoD:S Set Winners by Root
 *
 * Description:
-*   Sets winners in favor of team which had more tick points.
+*   Simply sets winners in favor of team which had more tick points.
 *
 * Version 1.0
 * Changelog & more info at http://goo.gl/4nKhJ
@@ -11,7 +11,7 @@
 #pragma semicolon 1
 #include <dodhooks>
 
-// ====[ CONSTANTS ]==============================================================
+// ====[ CONSTANTS ]=============================================================
 #define PLUGIN_NAME    "DoD:S Set Winners"
 #define PLUGIN_VERSION "1.0"
 
@@ -19,7 +19,7 @@
 #define TEAM_AXIS      3
 #define TEAM_SIZE      4
 
-// ====[ VARIABLES ]==============================================================
+// ====[ VARIABLES ]=============================================================
 new	Handle:PWT_Enabled,
 	Handle:mp_timelimit,
 	Handle:dod_bonusroundtime,
@@ -27,7 +27,7 @@ new	Handle:PWT_Enabled,
 	Handle:TerminateRoundTimer,
 	TeamPoints[TEAM_SIZE];
 
-// ====[ PLUGIN ]=================================================================
+// ====[ PLUGIN ]================================================================
 public Plugin:myinfo =
 {
 	name        = PLUGIN_NAME,
@@ -41,7 +41,7 @@ public Plugin:myinfo =
 /* OnPluginStart()
  *
  * When the plugin starts up.
- * ------------------------------------------------------------------------------- */
+ * ------------------------------------------------------------------------------ */
 public OnPluginStart()
 {
 	CreateConVar("dod_setwinners_version", PLUGIN_VERSION, PLUGIN_NAME, FCVAR_NOTIFY|FCVAR_DONTRECORD);
@@ -51,14 +51,14 @@ public OnPluginStart()
 	mp_timelimit           = FindConVar("mp_timelimit");
 	dod_bonusroundtime     = FindConVar("dod_bonusroundtime");
 
-	// And custom one to automatically disable a plugin
+	// And custom one to automatically disable plugin
 	dod_finishround_source = FindConVar("dod_finishround_source");
 
-	// Hook changes for timelimit and bonusround time
+	// Hook changes for mp_timelimit and dod_bonusround
 	HookConVarChange(mp_timelimit,       OnTimeChanged);
 	HookConVarChange(dod_bonusroundtime, OnTimeChanged);
 
-	// Events to deal with tick points
+	// Hook events to deal with tick points
 	HookEvent("dod_tick_points", OnPointsReceive);
 	HookEvent("dod_round_start", OnRoundStart, EventHookMode_PostNoCopy);
 }
@@ -67,10 +67,10 @@ public OnPluginStart()
 /* OnConfigsExecuted()
  *
  * When the map has loaded and all plugin configs are done executing.
- * ------------------------------------------------------------------------------- */
+ * ------------------------------------------------------------------------------ */
 public OnConfigsExecuted()
 {
-	// Make sure dod_finishround_source convar is not set to 1
+	// Make sure dod_finishround_source convar is disabled
 	if (dod_finishround_source != INVALID_HANDLE
 	&& GetConVarBool(dod_finishround_source))
 	{
@@ -83,17 +83,17 @@ public OnConfigsExecuted()
 /* OnTimeChanged()
  *
  * Called when timelimit or bonusround time values has changed.
- * ------------------------------------------------------------------------------- */
+ * ------------------------------------------------------------------------------ */
 public OnTimeChanged(Handle:convar, const String:oldValue[], const String:newValue[])
 {
-	// Re-create a timer and set 'changed' bool as true (to kill previous timer)
+	// Re-create a timer and set 'changed' bool as true (to kill old timer)
 	CreateTerminateRoundTimer(true);
 }
 
 /* OnPointsReceive()
  *
  * When team is received tick points.
- * ------------------------------------------------------------------------------- */
+ * ------------------------------------------------------------------------------ */
 public OnPointsReceive(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	// Add points for appropriate team
@@ -103,7 +103,7 @@ public OnPointsReceive(Handle:event, const String:name[], bool:dontBroadcast)
 /* OnRoundStart()
  *
  * When new round starts.
- * ------------------------------------------------------------------------------- */
+ * ------------------------------------------------------------------------------ */
 public OnRoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	// Reset amount of points for both teams
@@ -114,7 +114,7 @@ public OnRoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 /* TimerCB()
  *
  * Timer to set winning team.
- * ------------------------------------------------------------------------------- */
+ * ------------------------------------------------------------------------------ */
 public Action:TimerCB(Handle:timer)
 {
 	// Make sure timer is invalid now
@@ -123,7 +123,7 @@ public Action:TimerCB(Handle:timer)
 	new winners; // Get the winner team
 	for (new i = 0; i < TEAM_SIZE; i++)
 	{
-		// If one team has more points than other, then its a winners
+		// If one team has more points than other, then we've got a winner!
 		if (TeamPoints[i] > TeamPoints[winners]) winners = i;
 	}
 
@@ -135,20 +135,20 @@ public Action:TimerCB(Handle:timer)
 		SetWinningTeam(winners);
 	}
 
-	// STAHP TIMUR
+	// STAHP TIMUR!!
 	return Plugin_Stop;
 }
 
 /* CreateTerminateRoundTimer()
  *
  * Creates a global timer to set winning team.
- * ------------------------------------------------------------------------------- */
+ * ------------------------------------------------------------------------------ */
 CreateTerminateRoundTimer(bool:changed)
 {
 	// Timer is not yet killed?
 	if (TerminateRoundTimer != INVALID_HANDLE)
 	{
-		// If value was changed - kill previous timer properly
+		// If time was changed - kill previous timer properly
 		if (changed) CloseHandle(TerminateRoundTimer);
 		TerminateRoundTimer = INVALID_HANDLE;
 	}
