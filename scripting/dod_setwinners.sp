@@ -64,11 +64,11 @@ public OnPluginStart()
 }
 
 
-/* OnConfigsExecuted()
+/* OnAutoConfigsBuffered()
  *
- * When the map has loaded and all plugin configs are done executing.
+ * Called all AutoExecConfig() exec commands have been added.
  * ------------------------------------------------------------------------------ */
-public OnConfigsExecuted()
+public OnAutoConfigsBuffered()
 {
 	// Make sure dod_finishround_source convar is disabled
 	if (dod_finishround_source != INVALID_HANDLE
