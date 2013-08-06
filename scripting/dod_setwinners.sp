@@ -11,15 +11,18 @@
 #pragma semicolon 1
 #include <dodhooks>
 
-// ====[ CONSTANTS ]=============================================================
+// ====[ CONSTANTS ]==============================================================
 #define PLUGIN_NAME    "DoD:S Set Winners"
 #define PLUGIN_VERSION "1.0"
 
-#define TEAM_ALLIES    2
-#define TEAM_AXIS      3
-#define TEAM_SIZE      4
+enum
+{
+	TEAM_ALLIES = 2,
+	TEAM_AXIS,
+	TEAM_SIZE
+}
 
-// ====[ VARIABLES ]=============================================================
+// ====[ VARIABLES ]==============================================================
 new	Handle:PWT_Enabled,
 	Handle:mp_timelimit,
 	Handle:dod_bonusroundtime,
@@ -27,7 +30,7 @@ new	Handle:PWT_Enabled,
 	Handle:TerminateRoundTimer,
 	TeamPoints[TEAM_SIZE];
 
-// ====[ PLUGIN ]================================================================
+// ====[ PLUGIN ]=================================================================
 public Plugin:myinfo =
 {
 	name        = PLUGIN_NAME,
@@ -41,7 +44,7 @@ public Plugin:myinfo =
 /* OnPluginStart()
  *
  * When the plugin starts up.
- * ------------------------------------------------------------------------------ */
+ * ------------------------------------------------------------------------------- */
 public OnPluginStart()
 {
 	CreateConVar("dod_setwinners_version", PLUGIN_VERSION, PLUGIN_NAME, FCVAR_NOTIFY|FCVAR_DONTRECORD);
@@ -64,36 +67,30 @@ public OnPluginStart()
 }
 
 
-/* OnAutoConfigsBuffered()
+/* OnConfigsExecuted()
  *
- * Called all AutoExecConfig() exec commands have been added.
- * ------------------------------------------------------------------------------ */
-public OnAutoConfigsBuffered()
+ * When the map has loaded and all plugin configs are done executing.
+ * ------------------------------------------------------------------------------- */
+public OnConfigsExecuted()
 {
-	// Make sure dod_finishround_source convar is disabled
-	if (dod_finishround_source != INVALID_HANDLE
-	&& GetConVarBool(dod_finishround_source))
-	{
-		// Unfortunately we have to disable plugin then
-		SetConVarBool(PWT_Enabled, false);
-	}
-	else CreateTerminateRoundTimer(false); // Otherwise create timer and set 'changed' bool to false
+	// Create new global timer with proper map timelimit settings
+	CreateTerminateRoundTimer(false);
 }
 
 /* OnTimeChanged()
  *
  * Called when timelimit or bonusround time values has changed.
- * ------------------------------------------------------------------------------ */
+ * ------------------------------------------------------------------------------- */
 public OnTimeChanged(Handle:convar, const String:oldValue[], const String:newValue[])
 {
-	// Re-create a timer and set 'changed' bool as true (to kill old timer)
+	// Re-create a timer and set 'changed' bool as true (to set time properly)
 	CreateTerminateRoundTimer(true);
 }
 
 /* OnPointsReceive()
  *
  * When team is received tick points.
- * ------------------------------------------------------------------------------ */
+ * ------------------------------------------------------------------------------- */
 public OnPointsReceive(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	// Add points for appropriate team
@@ -103,24 +100,30 @@ public OnPointsReceive(Handle:event, const String:name[], bool:dontBroadcast)
 /* OnRoundStart()
  *
  * When new round starts.
- * ------------------------------------------------------------------------------ */
+ * ------------------------------------------------------------------------------- */
 public OnRoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	// Reset amount of points for both teams
-	TeamPoints[TEAM_ALLIES] = 0;
-	TeamPoints[TEAM_AXIS]   = 0;
+	TeamPoints[TEAM_ALLIES] = TeamPoints[TEAM_AXIS] = 0;
 }
 
 /* TimerCB()
  *
  * Timer to set winning team.
- * ------------------------------------------------------------------------------ */
+ * ------------------------------------------------------------------------------- */
 public Action:TimerCB(Handle:timer)
 {
-	// Make sure timer is invalid now
 	TerminateRoundTimer = INVALID_HANDLE;
 
-	new winners; // Get the winner team
+	// Make sure dod_finishround_source convar is disabled
+	if (dod_finishround_source != INVALID_HANDLE
+	&& GetConVarBool(dod_finishround_source) == true)
+	{
+		// If not - just stop the timer to prevent SetWinningTeam callback
+		return Plugin_Stop;
+	}
+
+	new winners; // Retrieve the winning team by tick points
 	for (new i = 0; i < TEAM_SIZE; i++)
 	{
 		// If one team has more points than other, then we've got a winner!
@@ -131,29 +134,26 @@ public Action:TimerCB(Handle:timer)
 	if (GetConVarBool(PWT_Enabled)
 	&& TeamPoints[winners] > 0)
 	{
-		// Yeah - set winning team using DoD Hooks
+		// Yeah, set winning team using DoD Hooks
 		SetWinningTeam(winners);
 	}
 
-	// STAHP TIMUR!!
 	return Plugin_Stop;
 }
 
 /* CreateTerminateRoundTimer()
  *
  * Creates a global timer to set winning team.
- * ------------------------------------------------------------------------------ */
+ * ------------------------------------------------------------------------------- */
 CreateTerminateRoundTimer(bool:changed)
 {
-	// Timer is not yet killed?
+	// Timer is not yet killed? Then we should kill it!
 	if (TerminateRoundTimer != INVALID_HANDLE)
 	{
-		// If time was changed - kill previous timer properly
-		if (changed) CloseHandle(TerminateRoundTimer);
 		TerminateRoundTimer = INVALID_HANDLE;
 	}
 
-	// Get the time limit at this moment for a map
+	// Get the time limit at this moment for a current map
 	new timeleft;
 	if (GetMapTimeLeft(timeleft))
 	{
@@ -161,7 +161,7 @@ CreateTerminateRoundTimer(bool:changed)
 		// So when map is changed - set timeleft as timelimit value * 60
 		if (changed == false) timeleft = GetConVarInt(mp_timelimit) * 60;
 
-		// Get the bonusround time
+		// Retrieve the time of a bonus round
 		new Float:bonustime = GetConVarFloat(dod_bonusroundtime);
 
 		// Create global timer equal to (timelimit - bonusroundtime) to set winning team in a proper event
