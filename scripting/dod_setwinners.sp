@@ -27,7 +27,7 @@ new	Handle:PWT_Enabled,
 	Handle:mp_timelimit,
 	Handle:dod_bonusroundtime,
 	Handle:dod_finishround_source,
-	Handle:TerminateRoundTimer,
+	Handle:WinnersTimer,
 	TeamPoints[TEAM_SIZE];
 
 // ====[ PLUGIN ]=================================================================
@@ -62,7 +62,7 @@ public OnPluginStart()
 	HookConVarChange(dod_bonusroundtime, OnTimeChanged);
 
 	// Hook events to deal with tick points
-	HookEvent("dod_tick_points", OnPointsReceive);
+	HookEvent("dod_tick_points", OnPointsReceive, EventHookMode_Post);
 	HookEvent("dod_round_start", OnRoundStart, EventHookMode_PostNoCopy);
 }
 
@@ -73,8 +73,8 @@ public OnPluginStart()
  * ------------------------------------------------------------------------------- */
 public OnConfigsExecuted()
 {
-	// Create new global timer with proper map timelimit settings
-	CreateTerminateRoundTimer(false);
+	WinnersTimer = INVALID_HANDLE;
+	CreateWinnersTimer(false);
 }
 
 /* OnTimeChanged()
@@ -83,8 +83,8 @@ public OnConfigsExecuted()
  * ------------------------------------------------------------------------------- */
 public OnTimeChanged(Handle:convar, const String:oldValue[], const String:newValue[])
 {
-	// Re-create a timer and set 'changed' bool as true (to set time properly)
-	CreateTerminateRoundTimer(true);
+	// Create new round timer and set 'changed' bool as true to set time properly
+	CreateWinnersTimer(true);
 }
 
 /* OnPointsReceive()
@@ -107,19 +107,19 @@ public OnRoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 	TeamPoints[TEAM_ALLIES] = TeamPoints[TEAM_AXIS] = 0;
 }
 
-/* TimerCB()
+/* Timer_SetWinners()
  *
  * Timer to set winning team.
  * ------------------------------------------------------------------------------- */
-public Action:TimerCB(Handle:timer)
+public Action:Timer_SetWinners(Handle:timer)
 {
-	TerminateRoundTimer = INVALID_HANDLE;
+	WinnersTimer = INVALID_HANDLE;
 
-	// Make sure dod_finishround_source convar is disabled
+	// Make sure dod_finishround_source convar is disabled (if even exists)
 	if (dod_finishround_source != INVALID_HANDLE
 	&& GetConVarBool(dod_finishround_source) == true)
 	{
-		// If not - just stop the timer to prevent SetWinningTeam callback
+		// It's enabled - so now stop the timer to prevent SetWinningTeam callback
 		return Plugin_Stop;
 	}
 
@@ -130,29 +130,22 @@ public Action:TimerCB(Handle:timer)
 		if (TeamPoints[i] > TeamPoints[winners]) winners = i;
 	}
 
-	// Does plugin is enabled and any points were received during last round?
-	if (GetConVarBool(PWT_Enabled)
-	&& TeamPoints[winners] > 0)
+	// Does plugin is enabled and any tick points were received during last round?
+	if (GetConVarBool(PWT_Enabled) && TeamPoints[winners] > 0)
 	{
-		// Yeah, set winning team using DoD Hooks
+		// Yep, call DoD Hooks native to set winning team (too bad GameRules_SetProp not working)
 		SetWinningTeam(winners);
 	}
 
 	return Plugin_Stop;
 }
 
-/* CreateTerminateRoundTimer()
+/* CreateWinnersTimer()
  *
  * Creates a global timer to set winning team.
  * ------------------------------------------------------------------------------- */
-CreateTerminateRoundTimer(bool:changed)
+CreateWinnersTimer(bool:changed)
 {
-	// Timer is not yet killed? Then we should kill it!
-	if (TerminateRoundTimer != INVALID_HANDLE)
-	{
-		TerminateRoundTimer = INVALID_HANDLE;
-	}
-
 	// Get the time limit at this moment for a current map
 	new timeleft;
 	if (GetMapTimeLeft(timeleft))
@@ -162,9 +155,16 @@ CreateTerminateRoundTimer(bool:changed)
 		if (changed == false) timeleft = GetConVarInt(mp_timelimit) * 60;
 
 		// Retrieve the time of a bonus round
-		new Float:bonustime = GetConVarFloat(dod_bonusroundtime);
+		new Float:bonustime = FloatSub(GetConVarFloat(dod_bonusroundtime), 1.0);
+
+		// Timer is not yet killed? Then kill it immediately to prevent errors
+		if (WinnersTimer != INVALID_HANDLE)
+		{
+			KillTimer(WinnersTimer);
+			WinnersTimer = INVALID_HANDLE;
+		}
 
 		// Create global timer equal to (timelimit - bonusroundtime) to set winning team in a proper event
-		TerminateRoundTimer = CreateTimer(FloatSub(float(timeleft), bonustime), TimerCB, _, TIMER_FLAG_NO_MAPCHANGE);
+		WinnersTimer = CreateTimer(FloatSub(float(timeleft), bonustime), Timer_SetWinners, _, TIMER_FLAG_NO_MAPCHANGE);
 	}
 }
