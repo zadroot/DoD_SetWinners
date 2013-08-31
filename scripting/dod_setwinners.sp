@@ -67,11 +67,11 @@ public OnPluginStart()
 }
 
 
-/* OnConfigsExecuted()
+/* OnAutoConfigsBuffered()
  *
- * When the map has loaded and all plugin configs are done executing.
+ * Called after map start but any time before OnConfigsExecuted().
  * ------------------------------------------------------------------------------- */
-public OnConfigsExecuted()
+public OnAutoConfigsBuffered()
 {
 	WinnersTimer = INVALID_HANDLE;
 	CreateWinnersTimer(false);
@@ -79,7 +79,7 @@ public OnConfigsExecuted()
 
 /* OnTimeChanged()
  *
- * Called when timelimit or bonusround time values has changed.
+ * Called when timelimit or bonusround time has changed.
  * ------------------------------------------------------------------------------- */
 public OnTimeChanged(Handle:convar, const String:oldValue[], const String:newValue[])
 {
@@ -131,7 +131,7 @@ public Action:Timer_SetWinners(Handle:timer)
 	}
 
 	// Does plugin is enabled and any tick points were received during last round?
-	if (GetConVarBool(PWT_Enabled) && TeamPoints[winners] > 0)
+	if (GetConVarBool(PWT_Enabled) && winners > 0 && TeamPoints[winners] > 0)
 	{
 		// Yep, call DoD Hooks native to set winning team (too bad GameRules_SetProp not working)
 		SetWinningTeam(winners);
@@ -157,7 +157,7 @@ CreateWinnersTimer(bool:changed)
 		// Retrieve the time of a bonus round
 		new Float:bonustime = FloatSub(GetConVarFloat(dod_bonusroundtime), 1.0);
 
-		// Timer is not yet killed? Then kill it immediately to prevent errors
+		// Kill timer right after changing time to prevent errors
 		if (WinnersTimer != INVALID_HANDLE)
 		{
 			KillTimer(WinnersTimer);
