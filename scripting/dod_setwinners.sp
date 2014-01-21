@@ -8,10 +8,9 @@
 * Changelog & more info at http://goo.gl/4nKhJ
 */
 
-#pragma semicolon 1
 #include <dodhooks>
 
-// ====[ CONSTANTS ]==============================================================
+// ====[ CONSTANTS ]========================================================
 #define PLUGIN_NAME    "DoD:S Set Winners"
 #define PLUGIN_VERSION "1.0"
 
@@ -19,10 +18,11 @@ enum
 {
 	TEAM_ALLIES = 2,
 	TEAM_AXIS,
-	TEAM_SIZE
-}
 
-// ====[ VARIABLES ]==============================================================
+	TEAM_SIZE // Max. amount of teams in DoD:S
+};
+
+// ====[ VARIABLES ]========================================================
 new	Handle:PWT_Enabled,
 	Handle:mp_timelimit,
 	Handle:dod_bonusroundtime,
@@ -30,7 +30,7 @@ new	Handle:PWT_Enabled,
 	Handle:WinnersTimer,
 	TeamPoints[TEAM_SIZE];
 
-// ====[ PLUGIN ]=================================================================
+// ====[ PLUGIN ]===========================================================
 public Plugin:myinfo =
 {
 	name        = PLUGIN_NAME,
@@ -38,13 +38,13 @@ public Plugin:myinfo =
 	description = "Simply sets winners in favor of team which had more tick points",
 	version     = PLUGIN_VERSION,
 	url         = "http://dodsplugins.com/"
-};
+}
 
 
 /* OnPluginStart()
  *
  * When the plugin starts up.
- * ------------------------------------------------------------------------------- */
+ * ------------------------------------------------------------------------- */
 public OnPluginStart()
 {
 	CreateConVar("dod_setwinners_version", PLUGIN_VERSION, PLUGIN_NAME, FCVAR_NOTIFY|FCVAR_DONTRECORD);
@@ -67,11 +67,11 @@ public OnPluginStart()
 }
 
 
-/* OnAutoConfigsBuffered()
+/* OnMapStart()
  *
- * Called after map start but any time before OnConfigsExecuted().
- * ------------------------------------------------------------------------------- */
-public OnAutoConfigsBuffered()
+ * Called when the map is loaded.
+ * ------------------------------------------------------------------------- */
+public OnMapStart()
 {
 	WinnersTimer = INVALID_HANDLE;
 	CreateWinnersTimer(false);
@@ -80,7 +80,7 @@ public OnAutoConfigsBuffered()
 /* OnTimeChanged()
  *
  * Called when timelimit or bonusround time has changed.
- * ------------------------------------------------------------------------------- */
+ * ------------------------------------------------------------------------- */
 public OnTimeChanged(Handle:convar, const String:oldValue[], const String:newValue[])
 {
 	// Create new round timer and set 'changed' bool as true to set time properly
@@ -90,7 +90,7 @@ public OnTimeChanged(Handle:convar, const String:oldValue[], const String:newVal
 /* OnPointsReceive()
  *
  * When team is received tick points.
- * ------------------------------------------------------------------------------- */
+ * ------------------------------------------------------------------------- */
 public OnPointsReceive(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	// Add points for appropriate team
@@ -100,7 +100,7 @@ public OnPointsReceive(Handle:event, const String:name[], bool:dontBroadcast)
 /* OnRoundStart()
  *
  * When new round starts.
- * ------------------------------------------------------------------------------- */
+ * ------------------------------------------------------------------------- */
 public OnRoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	// Reset amount of points for both teams
@@ -110,7 +110,7 @@ public OnRoundStart(Handle:event, const String:name[], bool:dontBroadcast)
 /* Timer_SetWinners()
  *
  * Timer to set winning team.
- * ------------------------------------------------------------------------------- */
+ * ------------------------------------------------------------------------- */
 public Action:Timer_SetWinners(Handle:timer)
 {
 	WinnersTimer = INVALID_HANDLE;
@@ -123,17 +123,17 @@ public Action:Timer_SetWinners(Handle:timer)
 		return Plugin_Stop;
 	}
 
-	new winners; // Retrieve the winning team by tick points
-	for (new i = 0; i < TEAM_SIZE; i++)
+	new winners; // Retrieve the winning team by their tickpoints
+	for (new i; i < TEAM_SIZE; i++)
 	{
-		// If one team has more points than other, then we've got a winner!
+		// If one team has more points than other, then we've got a winner
 		if (TeamPoints[i] > TeamPoints[winners]) winners = i;
 	}
 
-	// Does plugin is enabled and any tick points were received during last round?
-	if (GetConVarBool(PWT_Enabled) && winners > 0 && TeamPoints[winners] > 0)
+	// Check if does plugin is enabled and any tick points were received during last round
+	if (GetConVarBool(PWT_Enabled) && winners && TeamPoints[winners])
 	{
-		// Yep, call DoD Hooks native to set winning team (too bad GameRules_SetProp not working)
+		// Yep - call DoD Hooks native to set winning team (too bad GameRules_SetProp not working)
 		SetWinningTeam(winners);
 	}
 
@@ -143,7 +143,7 @@ public Action:Timer_SetWinners(Handle:timer)
 /* CreateWinnersTimer()
  *
  * Creates a global timer to set winning team.
- * ------------------------------------------------------------------------------- */
+ * ------------------------------------------------------------------------- */
 CreateWinnersTimer(bool:changed)
 {
 	// Get the time limit at this moment for a current map
